@@ -4,18 +4,25 @@
 
 - Original Source: `https://github.com/anreonyr/sqware.git`
 - Frozen Source snapshot for this slice: `94e114614bec53424ac55e640fc80cf19a3e7107`
-  (read-only tree mounted at `source-readonly/`)
 - Client Source path: `programs/src/driver/rtc/client.rs`
 - API Source paths (earlier API candidate, unchanged here):
   - `programs/src/driver/rtc/api/src/lib.rs`
   - `programs/src/driver/rtc/core/fail.rs`
   - `programs/src/driver/rtc/core/frame.rs`
 
-This snapshot contains `rtc-api` and `rtc-client` only. The RTC server,
-declaration, device mapping, runtime, `UnitFile`, and image remain outside this
-repository. The API files were transferred earlier from Source commit
+This snapshot contains `rtc-api`, `rtc-client`, `rtc-server`, and
+`rtc-declaration`. The server and declaration are transferred from the frozen
+Source commit `94e114614bec53424ac55e640fc80cf19a3e7107`; the API files were
+transferred earlier from Source commit
 `ac5b61d8880c499f8cee4c60929c06cc9f4820d8`; this client slice takes the frozen
 snapshot `94e114614bec53424ac55e640fc80cf19a3e7107` as its Source anchor.
+
+The public branch base for the server/declaration slice is
+`7aac60314169e57265d62960a48c90797a640887` (public PR #1 base). The
+`driver-shared` provider is pinned at
+`e75b1e232f828666956fb7e02c61a7d84f13eb66`. The server's build script and thin
+binary follow the public Router extraction pattern; they are scaffolding, not
+copied Source behavior.
 
 ## File map
 
@@ -31,6 +38,30 @@ snapshot `94e114614bec53424ac55e640fc80cf19a3e7107` as its Source anchor.
 | `programs/src/driver/rtc/core/frame.rs` (`Status`, `impl Status`, `impl Message for Status`) | `api/src/frame/status.rs` | Item/impl bodies verbatim; only `use` lines added. |
 | `programs/src/driver/rtc/client.rs` (crate doc, `now`, `arm`, `why`) | `client/src/lib.rs` | Function bodies verbatim; `use` paths retargeted to `rtc_api` and `system_support`; `Alarm` moved to its own file; `#![no_std]` and `extern crate alloc` added. |
 | `programs/src/driver/rtc/client.rs` (`Alarm`, `impl Alarm`) | `client/src/alarm.rs` | Item/impl bodies verbatim; only `use` lines added; field visibility `pub(super)` for construction by `arm`. |
+| `programs/src/driver/rtc/mod.rs` (`E_RTC`) | `server/src/lib.rs` | Value and documentation retained; `pub const E_RTC: env::Reason = 12`. |
+| `programs/src/driver/rtc/main.rs` (`ASK`, `MS`, `main` body) | `server/src/lib.rs` | `main` body becomes public `serve`; only provider paths retargeted (`programs::debug` to `crate::debug`, `programs::driver::shared` to `driver_shared`, `programs::driver::rtc::core` to `crate::core`, local `E_RTC`). |
+| `programs/src/driver/rtc/main.rs` (entry shell) | `server/src/main.rs` | Thin `#[mold::entry]` binary `rtc`; calls `rtc_server::serve`. |
+| `programs/src/driver/rtc/core/host.rs` (`Answer`) | `server/src/core/host/answer.rs` | Item verbatim; own file. |
+| `programs/src/driver/rtc/core/host.rs` (`Ring`) | `server/src/core/host/ring.rs` | Item verbatim; own file. |
+| `programs/src/driver/rtc/core/host.rs` (`Host`, `impl Host`) | `server/src/core/host/host.rs` | Item/impl bodies verbatim; `super::frame` to `rtc_api::frame`, `super::slot` to `crate::core::slot`; `Answer`/`Ring` split to sibling files. |
+| `programs/src/driver/rtc/core/slot.rs` (`Cell`) | `server/src/core/slot/cell.rs` | Item verbatim; own file. |
+| `programs/src/driver/rtc/core/slot.rs` (`Slot`, `impl Slot`) | `server/src/core/slot/slot.rs` | Item/impl bodies verbatim; `super::Fail` to `rtc_api::Fail`, `Cell` from sibling file. |
+| `programs/src/driver/rtc/core/mod.rs` | `server/src/core/mod.rs` | Module declarations reduced to the pure server core; `frame` and `Fail` remain owned by `rtc-api`. |
+| `programs/src/driver/rtc/dev/rtc.rs` | `server/src/dev/rtc.rs` | Bodies token-identical; only the builtin `core::ptr` path is absolute (`::core::ptr`) because the server root has a local `core` module. |
+| `programs/src/driver/rtc/adapt/desk.rs` | `server/src/adapt/desk.rs` | Bodies token-identical; only `use` paths retargeted to `crate::core`, `crate::debug`, `crate::dev`, and `rtc_api::frame`. |
+| `programs/src/driver/rtc/adapt/resident.rs` | `server/src/adapt/resident.rs` | Bodies token-identical; only `use` paths retargeted to `crate::core`, `crate::debug`, `crate::dev`, `crate::E_RTC`, `driver_shared`, and `rtc_api::frame`. |
+| `programs/src/driver/rtc/adapt/mod.rs` | `server/src/adapt/mod.rs` | Module declarations verbatim. |
+| `programs/src/driver/rtc/dev/mod.rs` | `server/src/dev/mod.rs` | Module declaration verbatim. |
+| `crates/composition/src/units/rtc.rs` | `declaration/src/lib.rs` | `PROGRAM` becomes `UNIT`; every UnitFile field value identical; only `crate::unit` paths retargeted to the public `unit` crate. `BUILD` added from the Router extraction manifest contract. |
+| not Source | `server/Cargo.toml`, `server/build.rs`, `server/src/main.rs` | Public Router extraction scaffolding: package `rtc-server`, bin `rtc`, and the published linker-script build glue. |
+| not Source | `tests/server/{Cargo.toml,lib.rs}` | New host-only fixture; path-includes the production pure core and asserts compiled `rtc_declaration::UNIT`/`BUILD` fields. |
+
+No frame shape, wire code, `BACK`, `OK`, entry coordinate, or service-side
+`Fail` is duplicated in the server or declaration. The local `ASK` device
+request in `server/src/lib.rs` is not the protocol `frame::ASK`; it is the
+historical `google,goldfish-rtc` claim and keeps its original values. The
+server's `core` and `adapt`/`dev` modules are private. The declaration owns
+exactly one `UnitFile` and one `ImageBuild` and defines no `PROGRAM` alias.
 
 The structural adaptation is the project one-structure-per-file rule: the
 original grouped frame file is split by shape, and the client's single `Alarm`
@@ -46,14 +77,12 @@ are associated constants of that trait. It keeps the original no-`Drop` shape,
 the 20-call diagnostic cap in `why`, every seal/release cleanup path, and the
 original `Denied`/timeout failure mapping.
 
-## Candidate SHA-256 values
+## Historical API candidate SHA-256 values (prior API slice only)
 
-Copied from Root's candidate proof
-`/workspace/evidence/router-next/rtc-api-candidate/proof.json`. The proof records
-source hashes at grouped-file granularity; it supplies no per-item hash for the
-split frame bodies. These values cover the API candidate only; the client files
-are hashed separately in the current Root validation evidence; no client hash
-is claimed by this historical API table.
+This retained table covers the earlier API slice only. It records source hashes
+at grouped-file granularity and supplies no per-item hash for the split frame
+bodies. No client, server, or declaration hash is claimed here; the current
+server/declaration code map is the file map above.
 
 ### Original Source
 
@@ -88,13 +117,16 @@ The Source root has no project LICENSE. This snapshot invents none and does not
 rewrite Source or prior public histories. Existing file headers and comments are
 retained.
 
-## Candidate status
+## Validation status
 
-The historical hash table above covers the API only. Current Root evidence
-also records 20 preservation checks, four warnings-denied host/RISC-V
-debug/release builds with nightly-2026-09-04, 11 unchanged protocol tests with
-normal test flags, and an independent consumer compiling public signatures
-and the shared Fail identity. The README records the two retained failed
-attempts and the validation limits. Independent review, public clean-checkout
-proof and publication remain separate gates. Server, declaration, runtime,
-and Source intake remain pending and are not claimed here.
+The historical API/client evidence remains as recorded above. The
+server/declaration slice adds the current file map and host-only compiled
+declaration assertions; it has no new candidate hash table. Initial validation
+passed 10 server tests and a warnings-denied host library build, and preservation
+passed all checks after allowing `::core::ptr` and `::unit::READY_MARK`
+qualification. Final command results, including typed declaration and RV ELF
+checks, belong in `VALIDATION.md` and are not claimed as passed here.
+
+No QEMU, boot, device, syscall, or other runtime acceptance has been performed.
+Remaining Vanllia/Driver intake, independent review, public clean-checkout
+reproduction, and publication remain outside this repository.

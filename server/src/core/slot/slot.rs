@@ -1,0 +1,51 @@
+//! 一台设备一个闹钟槽、两个原语（约 / 到点）。
+//! 它是**核的内件**：对外只经 super::Host（会话核持有它，一问/一投递都从它那里过），
+//! 故"一台设备一个闹钟寄存器"这件事不由调用方维护，而是由 super::Host 手里那一格承载。
+//! 清那一格）由适配层紧随原语之后做（它要动硬件，见 `src/adapt/`），故核心只记
+//! "约了哪个时刻、往哪回"，可独立推理。
+//! **一台设备只有一个闹钟寄存器**——这一条由类型承载：那一格只有两个变体，"两位客人一个
+//! 闹钟"写不出来。第二位客人来的时候格子非空 ⇒ 答 `Taken`，这是**决策 4（一位客人）的
+//! 落法**，不是一条运行期策略。
+
+use super::cell::Cell;
+use env::PieToken;
+use rtc_api::Fail;
+
+/// 那一格（一台设备一格）
+pub struct Slot {
+    cell: Cell,
+}
+
+impl Slot {
+    /// 起一格空的
+    pub const fn new() -> Slot {
+        Slot { cell: Cell::Idle }
+    }
+
+    /// **约**：占住那一格
+    /// 格非空 ⇒ `Taken`；`at` 已经过去 ⇒ `Past`。**成与不成都不动已有一格的内容**——
+    /// **`Past` 是本面的策略，不是设备的事实**：设备对过去的时刻是**当场就报**（低半格那次写
+    /// 会立刻比较一次，见 `dev/rtc.rs` 头注）；本面选择当场答 `Past`，因为"你约的时刻已经过去了"
+    /// 而 `now` 由适配层从设备读出来交给它（核心不碰设备）
+    pub fn arm(&mut self, at: u64, back: PieToken, now: u64) -> Result<(), Fail> {
+        if matches!(self.cell, Cell::Armed { .. }) {
+            return Err(Fail::Taken);
+        }
+        if at <= now {
+            return Err(Fail::Past);
+        }
+        self.cell = Cell::Armed { at, back };
+        Ok(())
+    }
+
+    /// **到点**：把那一格取出来（**格因此回空**）、交出"往哪回"；没到点 / 空着 ⇒ `None`
+    pub fn fire(&mut self, now: u64) -> Option<PieToken> {
+        match self.cell {
+            Cell::Armed { at, back } if now >= at => {
+                self.cell = Cell::Idle;
+                Some(back)
+            }
+            _ => None,
+        }
+    }
+}
