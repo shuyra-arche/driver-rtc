@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["api"]
+members = ["api", "client"]
 exclude = ["tests/api"]
 
 [workspace.package]
