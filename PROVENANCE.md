@@ -3,14 +3,19 @@
 ## Source anchor
 
 - Original Source: `https://github.com/anreonyr/sqware.git`
-- Frozen Source commit: `ac5b61d8880c499f8cee4c60929c06cc9f4820d8`
-- Original RTC paths:
+- Frozen Source snapshot for this slice: `94e114614bec53424ac55e640fc80cf19a3e7107`
+  (read-only tree mounted at `source-readonly/`)
+- Client Source path: `programs/src/driver/rtc/client.rs`
+- API Source paths (earlier API candidate, unchanged here):
   - `programs/src/driver/rtc/api/src/lib.rs`
   - `programs/src/driver/rtc/core/fail.rs`
   - `programs/src/driver/rtc/core/frame.rs`
 
-This snapshot contains `rtc-api` only. The RTC client, server, declaration,
-device mapping, runtime, `UnitFile`, and image remain outside this repository.
+This snapshot contains `rtc-api` and `rtc-client` only. The RTC server,
+declaration, device mapping, runtime, `UnitFile`, and image remain outside this
+repository. The API files were transferred earlier from Source commit
+`ac5b61d8880c499f8cee4c60929c06cc9f4820d8`; this client slice takes the frozen
+snapshot `94e114614bec53424ac55e640fc80cf19a3e7107` as its Source anchor.
 
 ## File map
 
@@ -24,19 +29,31 @@ device mapping, runtime, `UnitFile`, and image remain outside this repository.
 | `programs/src/driver/rtc/core/frame.rs` (`Wire`, `impl Wire`) | `api/src/frame/wire.rs` | Item/impl body verbatim; only `use` lines added. |
 | `programs/src/driver/rtc/core/frame.rs` (`Time`, `impl Time`, `impl Message for Time`) | `api/src/frame/time.rs` | Item/impl bodies verbatim; only `use` lines added. |
 | `programs/src/driver/rtc/core/frame.rs` (`Status`, `impl Status`, `impl Message for Status`) | `api/src/frame/status.rs` | Item/impl bodies verbatim; only `use` lines added. |
+| `programs/src/driver/rtc/client.rs` (crate doc, `now`, `arm`, `why`) | `client/src/lib.rs` | Function bodies verbatim; `use` paths retargeted to `rtc_api` and `system_support`; `Alarm` moved to its own file; `#![no_std]` and `extern crate alloc` added. |
+| `programs/src/driver/rtc/client.rs` (`Alarm`, `impl Alarm`) | `client/src/alarm.rs` | Item/impl bodies verbatim; only `use` lines added; field visibility `pub(super)` for construction by `arm`. |
 
 The structural adaptation is the project one-structure-per-file rule: the
-original grouped frame file is split by shape, not semantically. The codec
-definition stays single-source. `api/src/frame/mod.rs` contains only constants,
-module declarations, and re-exports; the external `wire::OK` re-export uses the
+original grouped frame file is split by shape, and the client's single `Alarm`
+struct is split from the free functions. The codec definition stays
+single-source. `api/src/frame/mod.rs` contains only constants, module
+declarations, and re-exports; the external `wire::OK` re-export uses the
 absolute `::wire::OK` path so it cannot bind the local `wire` shape module.
+`client/src/lib.rs` re-exports `rtc_api::Fail` and `Alarm`; it defines neither
+`Fail` nor any frame shape.
+
+The client keeps `use wire::Message;` because `Time::EMPTY` and `Status::EMPTY`
+are associated constants of that trait. It keeps the original no-`Drop` shape,
+the 20-call diagnostic cap in `why`, every seal/release cleanup path, and the
+original `Denied`/timeout failure mapping.
 
 ## Candidate SHA-256 values
 
 Copied from Root's candidate proof
 `/workspace/evidence/router-next/rtc-api-candidate/proof.json`. The proof records
 source hashes at grouped-file granularity; it supplies no per-item hash for the
-split frame bodies.
+split frame bodies. These values cover the API candidate only; the client files
+are hashed separately in the current Root validation evidence; no client hash
+is claimed by this historical API table.
 
 ### Original Source
 
@@ -73,6 +90,11 @@ retained.
 
 ## Candidate status
 
-The hashes and checks above are Root's candidate evidence only. The public
-clean-checkout proof, publication commit, client, server, declaration, runtime,
+The historical hash table above covers the API only. Current Root evidence
+also records 20 preservation checks, four warnings-denied host/RISC-V
+debug/release builds with nightly-2026-09-04, 11 unchanged protocol tests with
+normal test flags, and an independent consumer compiling public signatures
+and the shared Fail identity. The README records the two retained failed
+attempts and the validation limits. Independent review, public clean-checkout
+proof and publication remain separate gates. Server, declaration, runtime,
 and Source intake remain pending and are not claimed here.
