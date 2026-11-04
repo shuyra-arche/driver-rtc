@@ -1,7 +1,8 @@
 [workspace]
 resolver = "3"
-members = ["api", "client"]
-exclude = ["tests/api"]
+members = ["api", "client", "server", "declaration"]
+default-members = ["api", "client", "declaration"]
+exclude = ["tests/api", "tests/server"]
 
 [workspace.package]
 version = "0.1.0"
