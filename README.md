@@ -6,7 +6,9 @@ domain); `rtc-client`, the guest-side client built on that protocol (`now`,
 `arm`, and the `Alarm` returned by a successful `arm`); `rtc-server`, the
 focused server with the pure session core, device MMIO adapters, and the
 standalone `rtc` binary; and `rtc-declaration`, the single `UnitFile` and
-`BUILD` image manifest for that Unit.
+`BUILD` image manifest for that Unit. Root `unit.toml` carries the corresponding
+schema 1 runtime policy; the compiled declaration remains its preservation
+reference.
 
 The API files were transferred earlier from Source commit
 `ac5b61d8880c499f8cee4c60929c06cc9f4820d8`. The client, server, and declaration
@@ -68,11 +70,68 @@ wire codes, entry coordinates, and the service-side `Fail`; it imports
 `e75b1e232f828666956fb7e02c61a7d84f13eb66`. The declaration owns exactly one
 `UnitFile` and one `ImageBuild`.
 
+## Runtime declaration
+
+`unit.toml` uses stable id `rtc` and image `rtc`, the existing Cargo binary in
+`server/Cargo.toml` (package `rtc-server`, entry `server/src/main.rs`). Build
+metadata stays in `BUILD`: target `riscv64gc-unknown-none-elf`, release profile,
+default features enabled, and no additional features. The runtime declaration
+preserves the user address space, empty arguments and default stack; the
+service/shared/rtc subtree namespace and its 279 operation bits; public entry
+publication with STORE view; empty identity, supply, construction and retirement
+policies; absent supervision and source mark; READY_MARK signal; and resident
+ending. The entry mark deliberately remains `router_api::ENTRY_MARK`, matching
+both the legacy RTC declaration and the server's `unseal` call.
+
+`control.creation = "startup"` declares RTC startup. `requires = ["hub", "router"]`
+includes the actual provider closure, while `after = ["hub", "router"]` waits
+for those providers to become ready. System completes Operator bootstrap before
+creating Units, so the old `Bootstrap::Operator` dependency has no standalone
+Unit counterpart in either list.
+
+The old Vanllia `PRODUCT` composition put RTC in `targets.supervised = ["rtc"]`.
+That product relationship moves from static composition into RTC's runtime
+declaration as `control.groups = ["supervised"]`; System derives the dynamic
+target membership from startup Units' groups. RTC's own `supervision` remains
+absent. The later Daemon declaration must use `supervision = "supervised"` and
+both `requires = ["rtc"]` and `after = ["rtc"]` to retain the consumer side of
+this relationship. This change records RTC's side without migrating Daemon or
+the old scenarios.
+
+Full-width marks are quoted decimal strings. Schema 1 also accepts numeric
+values and quoted `0x` hexadecimal strings, and records encode native `u64`
+values. `tests/unit-document` compares every policy field with `UNIT`, exercises
+the complete binary record and actual runtime conversion, checks borrowed
+strings, validates signed/overflow rejection and the full `u64` range, and
+checks the Cargo image against `BUILD`.
+
+The document/record/runtime suite pins the public Unit revision
+`ad50b803c3bd5cd2ef90010d80badf23551e88d5`
+([Unit Draft #1](https://github.com/shuyra-arche/unit/pull/1)) and commits its
+own `tests/unit-document/Cargo.lock`. The `legacy-unit` test alias keeps the
+compiled declaration's original Unit types available for comparison across
+the two revisions. Production dependencies retain the legacy Unit pin
+`90396f0fda376e0693fb1b9553aa21864d241057`; the root and old test locks stay
+unchanged. Run the suite directly, without a local Unit checkout or Cargo patch:
+
+```sh
+source /workspace/.vanllia-tools/env.sh
+RUSTFLAGS='-Dwarnings' cargo test --locked \
+  --manifest-path tests/unit-document/Cargo.toml \
+  --target-dir /tmp/rtc-unit-public-target --target x86_64-unknown-linux-gnu
+RUSTFLAGS='-Dwarnings' cargo test --locked --offline \
+  --manifest-path tests/unit-document/Cargo.toml \
+  --target-dir /tmp/rtc-unit-public-target --target x86_64-unknown-linux-gnu
+```
+
+The first command fetches any missing public dependencies; the second uses
+the same committed lock and cached sources offline.
+
 ## Validation
 
 See `VALIDATION.md` for validation results and exact commands. The host suites
-cover 11 protocol tests and 10 server/declaration tests; they do not execute
-syscalls or MMIO.
+cover 11 protocol tests, 10 server/declaration tests, and seven runtime
+declaration tests; they do not execute syscalls or MMIO.
 
 Representative commands:
 
@@ -90,6 +149,6 @@ RUSTFLAGS='-Crelocation-model=static -Cforce-frame-pointers=yes -Ccode-model=med
 All four packages are implemented. Remaining work is intake into Vanllia/Driver
 and runtime acceptance. No QEMU, boot, device, syscall, or whole-machine runtime
 acceptance is performed or claimed. Adapter and MMIO behavior is covered by body
-preservation and review, not the host suite. Independent review and public
-clean-checkout proof are not claimed as completed; final records belong in
-`VALIDATION.md`. The public repository is `shuyra-arche/driver-rtc`.
+preservation and review, not the host suite. Current review results and the
+validation scope are recorded in `VALIDATION.md`. The public
+repository is `shuyra-arche/driver-rtc`.

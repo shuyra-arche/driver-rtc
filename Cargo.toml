@@ -2,7 +2,7 @@
 resolver = "3"
 members = ["api", "client", "server", "declaration"]
 default-members = ["api", "client", "declaration"]
-exclude = ["tests/api", "tests/server"]
+exclude = ["tests/api", "tests/server", "tests/unit-document"]
 
 [workspace.package]
 version = "0.1.0"
