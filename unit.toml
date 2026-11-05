@@ -1,0 +1,42 @@
+schema = 1
+id = "rtc"
+
+[loader]
+image = "rtc"
+space = "user"
+args = []
+stack = 0
+
+[[operator.namespace]]
+key = "service"
+placement = "shared"
+path = "rtc"
+scope = "subtree"
+ops = 279 # PART | UNPART | BIND | UNBIND | FIND
+permit = "public"
+
+[[operator.namespace.bindings]]
+name = "entry"
+mark = "13702911872889301267" # router_api::ENTRY_MARK, as in the legacy RTC declaration
+view = 2 # env::Access::STORE
+permit = "public"
+
+[identity]
+aliases = []
+grants = []
+
+[control]
+creation = "startup"
+# System completes Operator bootstrap before creating Units.
+requires = ["hub", "router"]
+after = ["hub", "router"]
+ready = { signal = "9887014109901452468" } # unit::READY_MARK
+ending = "resident"
+construction = []
+retirement = []
+# Vanllia PRODUCT previously declared targets.supervised = ["rtc"].
+groups = ["supervised"]
+guarded = false
+
+[supply]
+bindings = []
